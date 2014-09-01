@@ -2,7 +2,56 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 """
-MultiFastaDB -- 
+MultiFastaDB presents a collection of indexed fasta files as a single
+source.  The intent is to simplify accessing a virtual database of
+sequences that is distributed across multiple files.
+
+
+>>> from multifastadb import MultiFastaDB
+
+The simplest use is by passing a list of files or directories:
+
+>>> mfdb = MultiFastaDB(['tests/data/ncbi'])
+
+By default, MultiFastaDB looks for files ending in .fasta, .fa, .faa,
+.fna, and compressed versions of these ending in .gz.  (NOTE: One
+*must* use bgzip for compression; using gzip will fail on reading.)
+
+Fasta files from NCBI contain multiple identifiers for a single
+sequence encoded in the accession line, such as
+(gi|53292629|ref|NP_001005405.1|).  Optionally, MultiFastaDB will
+create a meta index to the ref entries:
+
+>>> mfdb = MultiFastaDB(['tests/data/ncbi'], use_meta_index=True)
+
+Sequences may be retrieved by the `fetch()` method, with optional
+sequence start and end bounds (in 0-based or interbase coordinates):
+
+>>> seq = mfdb.fetch('NP_001005405.1')
+>>> seq = mfdb.fetch('NP_001005405.1',0,10)
+
+NOTE: Fetching subsequences with bounds is much more efficient than:
+
+>>> seq = mfdb.fetch('NP_001005405.1')[0:10]    # Don't do this!
+
+If a sequence occurs more than once, only the first version is
+returned (intentionally).
+
+Attribute-based retrieval is also supported:
+
+>>> seq = mfdb['NP_001005405.1']
+>>> seq = mfdb['NP_001005405.1'][0:10]
+
+Attribute-based retrieval does not fetch any sequence
+immediately. Instead it returns a SequenceProxy object that fetches
+sequence lazily and transparently.  This is particularly useful for
+accessing large sequences (e.g., chromosomes).
+
+The locations of a given accession may be found with the `where_is()` method:
+
+>>> mfdb.where_is('gi|53292629|ref|NP_001005405.1|')   # doctest: +ELLIPSIS
+[('tests/data/ncbi/f1.human.protein.small.faa.gz', <pysam.cfaidx.Fastafile object at ...>)]
+
 """
 
 
@@ -16,19 +65,7 @@ import pysam
 
 
 class MultiFastaDB(object):
-    """present a collection of indexed fasta files as a single source
-
-    MultiFastaDB opens a set of indexed fasta files and provides
-    ordered lookup of a given accession across all of them.  The
-    intent is to simplify accessing a virtual database of sequences
-    that is distributed across multiple files.
-
-    >> from multifastafile import MultiFastaDB
-    >> mfdb = MultiFastaDB(['/a/file.fasta', '/a/dir/of/fastas/'])
-    >> mfdb.fetch('NM_01234.5', 60, 70)
-    >> mfdb['NM_01234.5'][60:70]   # (equivalent to the above)
-    >> mfdb.where_is('NM_01234.5')
-
+    """
     """
 
     class SequenceProxy(object):
@@ -43,21 +80,22 @@ class MultiFastaDB(object):
 
         """
 
-        def __init__(self,frsf,ac):
-            self.frsf = frsf
+        def __init__(self, mfdb, ac):
+            self.mfdb = mfdb
             self.ac = ac
 
-        def __getslice__(self,start_i,end_i):
-            return self.frsf.fetch(self.ac,start_i,end_i)
+        def __getslice__(self, start_i, end_i):
+            return self.mfdb.fetch(self.ac, start_i, end_i)
 
-        def __getitem__(self,i):
-            return self[i,i+1]
+        def __getitem__(self, i):
+            return self[i, i + 1]
 
         def __str__(self):
-            return self.frsf.fetch(self.ac)
+            return self.mfdb.fetch(self.ac)
+
 
     # WARNING: Pysam doesn't support zipped files - returns wrong query results
-    default_suffixes = ['fa', 'fasta', 'faa', 'fna']  # 'fa.gz', 'fasta.gz', 'faa.gz', 'fna.gz']
+    default_suffixes = ['fa', 'fasta', 'faa', 'fna', 'fa.gz', 'fasta.gz', 'faa.gz', 'fna.gz']
 
     def __init__(self, sources=[], suffixes=default_suffixes, use_meta_index=False):
         self._fastas = None
@@ -93,6 +131,7 @@ class MultiFastaDB(object):
                 self._fastas[fa_path] = pysam.Fastafile(fa_path)
         self.create_index()
 
+
     def create_index(self):
         """Create a convenience meta index in the form of an ordered dict
         that contains just the reference accession and not the full
@@ -112,10 +151,12 @@ class MultiFastaDB(object):
                     files = [e[0] for e in self.where_is(ac)]
                     self._logger.debug('duplicate sequence found for {ac} in {files}'.format(ac=ac, files=', '.join(files)))
 
+
     def where_is(self, ac):
         """return list of all (filename,pysam.Fastafile) pairs in which
         accession occurs
 
+        TODO: This is broken for meta index lookups
         """
         return [(fp, fh)
                 for fp, fh in self._fastas.iteritems()

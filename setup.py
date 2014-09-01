@@ -3,19 +3,6 @@ use_setuptools()
 
 from setuptools import setup, find_packages
 
-long_description = """MultiFastaDB opens a set of indexed fasta files and provides
-ordered lookup of a given accession across all of them.  The intent is
-to simplify accessing a virtual database of sequences that is
-distributed across multiple files.
-
->> from multifastafile import MultiFastaDB
->> mfdb = MultiFastaDB(['/a/file.fasta', '/a/dir/of/fastas/'])
->> mfdb.fetch('NM_01234.5', 60, 70)
->> mfdb['NM_01234.5'][60:70]   # (equivalent to the above)
->> mfdb.where_is('NM_01234.5')
-
-"""
-
 
 def version_handler(mgr, options):
     version = mgr.get_current_version()
@@ -25,7 +12,7 @@ def version_handler(mgr, options):
 
 setup(
     license = 'Apache License 2.0 (http://www.apache.org/licenses/LICENSE-2.0)',
-    long_description = long_description,
+    long_description=open('README.rst').read(),
     use_vcs_version = {'version_handler': version_handler},
     zip_safe = True,
 
@@ -55,7 +42,7 @@ setup(
     ],
 
     install_requires = [
-        'pysam',
+        'pysam >= 0.8.0',
     ],
 
     setup_requires = [

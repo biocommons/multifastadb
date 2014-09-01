@@ -4,7 +4,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import unittest
 
-import hgvs.dataproviders.multifastadb
+import multifastadb
+
 
 # ==> d1/f1.fasta <==
 # >s1
@@ -31,12 +32,12 @@ import hgvs.dataproviders.multifastadb
 # d2f4s6
 
 
+
 class MFDBTBase(unittest.TestCase):
     test_dir = os.path.join(os.path.dirname(__file__),'data')
-    print( test_dir )
     def setUp(self):
-        self.mfdb = hgvs.dataproviders.multifastadb.MultiFastaDB([ os.path.join(self.test_dir,s)
-                                                     for s in self.sources ], use_meta_index=self.use_meta_index)
+        self.mfdb = multifastadb.MultiFastaDB([os.path.join(self.test_dir,s) for s in self.sources],
+                                               use_meta_index=self.use_meta_index)
 
 
 class MFDB_Test_d1f1(MFDBTBase):
@@ -48,9 +49,9 @@ class MFDB_Test_d1f1(MFDBTBase):
         self.assertEqual( self.mfdb.lengths, [6,6] )
 
     def test_basic_sequence(self):
-        self.assertEqual( self.mfdb.fetch('s1'), 'd1f1s1' )
-        self.assertEqual( str(self.mfdb['s1']), 'd1f1s1' )
-        self.assertEqual( self.mfdb['s1'][:2], 'd1' )
+        self.assertEqual( self.mfdb.fetch('s1'), u'd1f1s1' )
+        self.assertEqual( str(self.mfdb['s1']), u'd1f1s1' )
+        self.assertEqual( self.mfdb['s1'][:2], u'd1' )
 
 
 class MFDB_Test_d1(MFDBTBase):
@@ -62,12 +63,13 @@ class MFDB_Test_d1(MFDBTBase):
         self.assertEqual( self.mfdb.lengths, [6,6,6,6] )
 
     def test_basic_sequence(self):
-        self.assertEqual( self.mfdb.fetch('s1'), 'd1f1s1' )
-        self.assertEqual( str(self.mfdb['s1']), 'd1f1s1' )
-        self.assertEqual( self.mfdb['s1'][:2], 'd1' )
-        self.assertEqual( self.mfdb.fetch('s3'), 'd1f2s3' )
-        self.assertEqual( str(self.mfdb['s3']), 'd1f2s3' )
-        self.assertEqual( self.mfdb['s3'][:2], 'd1' )
+        self.assertEqual( self.mfdb.fetch('s1'), u'd1f1s1' )
+        self.assertEqual( str(self.mfdb['s1']), u'd1f1s1' )
+        self.assertEqual( self.mfdb['s1'][:2], u'd1' )
+        self.assertEqual( self.mfdb.fetch('s3'), u'd1f2s3' )
+        self.assertEqual( str(self.mfdb['s3']), u'd1f2s3' )
+        self.assertEqual( self.mfdb['s3'][:2], u'd1' )
+
 
 class MFDB_Test_d2d1(MFDBTBase):
     sources = ['d2','d1']
@@ -79,35 +81,48 @@ class MFDB_Test_d2d1(MFDBTBase):
 
     def test_basic_sequence(self):
         # s1 appears twice; should get d2f3 version
-        self.assertEqual( self.mfdb.fetch('s1'), 'd2f3s1' )
-        self.assertEqual( str(self.mfdb['s1']), 'd2f3s1' )
-        self.assertEqual( self.mfdb['s1'][:2], 'd2' )
+        self.assertEqual( self.mfdb.fetch('s1'), u'd2f3s1' )
+        self.assertEqual( str(self.mfdb['s1']), u'd2f3s1' )
+        self.assertEqual( self.mfdb['s1'][:2], u'd2' )
 
-        self.assertEqual( self.mfdb.fetch('s5'), 'd2f3s5' )
-        self.assertEqual( str(self.mfdb['s5']), 'd2f3s5' )
-        self.assertEqual( self.mfdb['s5'][:2], 'd2' )
+        self.assertEqual( self.mfdb.fetch('s5'), u'd2f3s5' )
+        self.assertEqual( str(self.mfdb['s5']), u'd2f3s5' )
+        self.assertEqual( self.mfdb['s5'][:2], u'd2' )
 
-class MFDB_Test_Actual(MFDBTBase):
-    sources = ['real_examples']
+
+class Test_MultiFastaDB_NCBI(MFDBTBase):
+    sources = ['ncbi']
     use_meta_index = True
 
     def test_basic_file(self):
-        self.assertEquals( self.mfdb.references, ['gi|53292629|ref|NP_001005405.1|',
-                                                  'gi|52317162|ref|NP_001004713.1|',
-                                                  'gi|123173798|ref|NM_001005405.2|',
-                                                  'gi|52317161|ref|NM_001004713.1|',
-                                                  'gi|296923737|ref|NG_021245.2|',
-                                                  'gi|226510210|ref|NG_011805.1|',
+        self.assertEquals( self.mfdb.references, [u'gi|53292629|ref|NP_001005405.1|',
+                                                  u'gi|52317162|ref|NP_001004713.1|',
+                                                  u'gi|123173798|ref|NM_001005405.2|',
+                                                  u'gi|52317161|ref|NM_001004713.1|',
+                                                  u'gi|296923737|ref|NG_021245.2|',
+                                                  u'gi|226510210|ref|NG_011805.1|',
                                                   ])
         self.assertEquals( self.mfdb.lengths, [156,355,1029,1068,96420,1169911] )
 
+
     def test_basic_sequence(self):
-        self.assertEquals( self.mfdb.fetch('gi|53292629|ref|NP_001005405.1|'), 'MGCCGCSGGCGSGCGGCGSGSGGCGSGCGGCGSSCCVPICCCKPVCCCVPACSCSSCGSCGGSKGGCGSCGSSKGGCGSCGCSQSNCCKPCCSSSGCGSFCCQSSCSKPCCCQSSCCQSSCCKPCCCQSSCCQSSCFKPCCCQSSCCVPVCCQCKI')
-        self.assertEquals( self.mfdb.fetch('NP_001005405.1'), 'MGCCGCSGGCGSGCGGCGSGSGGCGSGCGGCGSSCCVPICCCKPVCCCVPACSCSSCGSCGGSKGGCGSCGSSKGGCGSCGCSQSNCCKPCCSSSGCGSFCCQSSCSKPCCCQSSCCQSSCCKPCCCQSSCCQSSCFKPCCCQSSCCVPVCCQCKI')
-        self.assertEquals( self.mfdb.fetch('NP_001005405.1',0,3), 'MGC')
+        self.assertEquals( self.mfdb.fetch('gi|53292629|ref|NP_001005405.1|'),
+                           u'MGCCGCSGGCGSGCGGCGSGSGGCGSGCGGCGSSCCVPICCCKPVCCCVPACSCSSCGSCGGSKGGCGSCGSSKGGCGSCGCSQSNCCKPCCSSSGCGSFCCQSSCSKPCCCQSSCCQSSCCKPCCCQSSCCQSSCFKPCCCQSSCCVPVCCQCKI')
+        self.assertEquals( self.mfdb.fetch('NP_001005405.1'),
+                           u'MGCCGCSGGCGSGCGGCGSGSGGCGSGCGGCGSSCCVPICCCKPVCCCVPACSCSSCGSCGGSKGGCGSCGSSKGGCGSCGCSQSNCCKPCCSSSGCGSFCCQSSCSKPCCCQSSCCQSSCCKPCCCQSSCCQSSCFKPCCCQSSCCVPVCCQCKI')
+        self.assertEquals( self.mfdb.fetch('NP_001005405.1',0,3), u'MGC')
+
+
+    def test_basic_proxy(self):
+        self.assertEquals( str(self.mfdb['NP_001005405.1']),
+                           u'MGCCGCSGGCGSGCGGCGSGSGGCGSGCGGCGSSCCVPICCCKPVCCCVPACSCSSCGSCGGSKGGCGSCGSSKGGCGSCGCSQSNCCKPCCSSSGCGSFCCQSSCSKPCCCQSSCCQSSCCKPCCCQSSCCQSSCFKPCCCQSSCCVPVCCQCKI' )
+        self.assertEquals( self.mfdb['NP_001005405.1'][0:3],
+                           u'MGC' )
+
 
 if __name__ == '__main__':
     unittest.main()
+
 
 ## <LICENSE>
 ## Copyright 2014 HGVS Contributors (https://bitbucket.org/hgvs/hgvs)
