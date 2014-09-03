@@ -10,7 +10,7 @@ def version_handler(mgr, options):
     version = mgr.get_current_version()
     if version.endswith('dev'):
         version += '-' + mgr._invoke('log', '-l1', '-r.', '--template', '{node|short}').strip()
-    elif re.match('^\d+\.\d+$',version):
+    elif re.match('^\d+\.\d+$', version):
         # StrictVersion considers x.y == x.y.0 and drops the .0 from a
         # repo tag.  Add it back and ensure that it's really a tag for
         # our parent.
@@ -20,7 +20,7 @@ def version_handler(mgr, options):
 
 setup(
     license = 'Apache License 2.0 (http://www.apache.org/licenses/LICENSE-2.0)',
-    long_description=open('README.rst').read(),
+    long_description = open('README.rst').read(),
     use_vcs_version = {'version_handler': version_handler},
     zip_safe = True,
 
@@ -50,7 +50,7 @@ setup(
     ],
 
     install_requires = [
-        'pysam >= 0.8.0',
+        'pysam==0.7.8',  # >= 0.8.0',  # needs coordination with uta_tools_align
     ],
 
     setup_requires = [

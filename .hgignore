@@ -12,6 +12,7 @@ syntax: glob
 *.pyc
 *.pylint
 *.tar.gz
+*.zip
 *~
 .*.conf.mk
 .DS_Store
