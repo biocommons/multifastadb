@@ -1,9 +1,6 @@
-from ez_setup import use_setuptools
-use_setuptools()
-
 import re
 
-from setuptools import setup, find_packages
+import setuptools
 
 
 def version_handler(mgr, options):
@@ -18,7 +15,8 @@ def version_handler(mgr, options):
         assert version in mgr.get_parent_tags('tip')
     return version
 
-setup(
+
+setuptools.setup(
     license = 'Apache License 2.0 (http://www.apache.org/licenses/LICENSE-2.0)',
     long_description = open('README.rst').read(),
     use_vcs_version = {'version_handler': version_handler},
@@ -28,7 +26,7 @@ setup(
     author_email = 'reecehart@gmail.com',
     description = """present a collection of indexed fasta files as a single source""",
     name = "multifastadb",
-    packages = [''],
+    packages = [],
     url = 'https://bitbucket.org/uta/multifastadb',
 
     classifiers = [
