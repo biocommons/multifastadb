@@ -26,7 +26,7 @@ setuptools.setup(
     author_email = 'reecehart@gmail.com',
     description = """present a collection of indexed fasta files as a single source""",
     name = "multifastadb",
-    packages = [],
+    py_modules = ['multifastadb'],
     url = 'https://bitbucket.org/uta/multifastadb',
 
     classifiers = [
