@@ -28,7 +28,7 @@ setup(
     author_email = 'reecehart@gmail.com',
     description = """present a collection of indexed fasta files as a single source""",
     name = "multifastadb",
-    packages = find_packages(),
+    packages = [''],
     url = 'https://bitbucket.org/uta/multifastadb',
 
     classifiers = [
