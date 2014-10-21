@@ -48,7 +48,7 @@ setuptools.setup(
     ],
 
     install_requires = [
-        'pysam==0.7.8',  # >= 0.8.0',  # needs coordination with uta_tools_align
+        'pysam>=0.7.0',
     ],
 
     setup_requires = [
