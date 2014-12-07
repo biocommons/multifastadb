@@ -27,7 +27,7 @@ setuptools.setup(
     description = """present a collection of indexed fasta files as a single source""",
     name = "multifastadb",
     py_modules = ['multifastadb'],
-    url = 'https://bitbucket.org/uta/multifastadb',
+    url = 'https://bitbucket.org/biocommons/multifastadb',
 
     classifiers = [
         "Development Status :: 3 - Alpha",
