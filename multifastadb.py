@@ -149,7 +149,7 @@ class MultiFastaDB(object):
 
         """
         self._index = collections.OrderedDict()
-        ncbi_re = re.compile('ref\|([^|]+)')
+        ncbi_re = re.compile('(?:ref|gb)\|([^|]+)')
         for ref in self.references:
             acs = [ref]
             if self.use_meta_index:
