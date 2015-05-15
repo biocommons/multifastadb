@@ -124,7 +124,7 @@ class MultiFastaDB(object):
             if (os.path.exists(fai_path) and os.stat(fa_path).st_mtime > os.stat(fai_path).st_mtime):
                 self._logger.warn(fai_path + " is out-of-date (older than fasta file)")
             faf = pysam.Fastafile(fa_path)    
-            self._logger.warn("opened " + fa_path)
+            self._logger.info("opened " + fa_path)
             return faf
 
         for source in self.sources:
@@ -137,7 +137,7 @@ class MultiFastaDB(object):
                     for f in fs
                     if any(f.endswith(sfx) for sfx in self.suffixes)]
 
-        self._fastas = collections.OrderedDict((fa_path,_open1(fa_path)) for fa_path in fa_paths)
+        self._fastas = collections.OrderedDict((fa_path, _open1(fa_path)) for fa_path in fa_paths)
 
         self.create_index()
 
