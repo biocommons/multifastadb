@@ -93,16 +93,23 @@ class MultiFastaDB(object):
         def __str__(self):
             return self.mfdb.fetch(self.ac)
 
-
-    # WARNING: Pysam doesn't support zipped files - returns wrong query results
-    default_suffixes = ['fa', 'fasta', 'faa', 'fna', 'fa.gz', 'fasta.gz', 'faa.gz', 'fna.gz']
+    # Files must be fasta formatted with one of the following standard
+    # fasta file extensions, or a block gzipped version of these
+    # (which is supported by pysam >=0.8.3).  For block gzipped files,
+    # use the bgzip tool provided with tabix. Standard gzip'd files do
+    # NOT work with samtools, and we're requiring users to rename to
+    # decrease confusion.
+    # See http://samtools.sourceforge.net/tabix.shtml
+    file_suffixes = ['fa', 'fasta', 'faa', 'fna']
+    compression_suffixes = ['bgz']
+    default_suffixes = file_suffixes + [fs + "." + cs for fs in file_suffixes for cs in compression_suffixes]
 
     def __init__(self, sources=[], suffixes=default_suffixes, use_meta_index=False):
         self._fastas = None
         self._index = None
         self._logger = logging.getLogger(__name__)
         self.sources = sources
-        self.suffixes = suffixes
+        self.suffixes = ["." + sfx for sfx in suffixes]
         self.use_meta_index = use_meta_index
         self.open_sources()
 
@@ -111,24 +118,27 @@ class MultiFastaDB(object):
         the instance was created.
 
         """
-        self._fastas = collections.OrderedDict()
+
+        def _open1(fa_path):
+            fai_path = fa_path + '.fai'
+            if (os.path.exists(fai_path) and os.stat(fa_path).st_mtime > os.stat(fai_path).st_mtime):
+                self._logger.warn(fai_path + " is out-of-date (older than fasta file)")
+            faf = pysam.Fastafile(fa_path)    
+            self._logger.warn("opened " + fa_path)
+            return faf
+
         for source in self.sources:
-            fa_paths = []
-            if os.path.isfile(source):
-                fa_paths = [source]
-            elif os.path.isdir(source):
-                # sort so that searches have defined ordering
-                fa_paths = sorted([os.path.join(source, de)
-                                   for de in os.listdir(source)
-                                   if any(de.endswith(sfx) for sfx in self.suffixes)])
-            else:
-                raise RuntimeError(source + ": expected a list of directories or files for fasta sources")
-            for fa_path in fa_paths:
-                self._logger.debug("opening " + fa_path)
-                fai_path = fa_path + '.fai'
-                if (os.path.exists(fai_path) and os.stat(fa_path).st_mtime > os.stat(fai_path).st_mtime):
-                    self._logger.warn(fai_path + " is out-of-date (older than fasta file)")
-                self._fastas[fa_path] = pysam.Fastafile(fa_path)
+            if not os.path.exists(source):
+                raise IOError("Sequence path does not exist: {}".format(source))
+
+        fa_paths = [os.path.join(r, f)
+                    for s in self.sources
+                    for r, _, fs in os.walk(s, followlinks=True)
+                    for f in fs
+                    if any(f.endswith(sfx) for sfx in self.suffixes)]
+
+        self._fastas = collections.OrderedDict((fa_path,_open1(fa_path)) for fa_path in fa_paths)
+
         self.create_index()
 
 
