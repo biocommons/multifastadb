@@ -119,6 +119,20 @@ class MultiFastaDB(object):
 
         """
 
+        def _find_files(sources):
+            for s in sources:
+                if os.path.isfile(s):
+                    yield s
+                    continue
+
+                if os.path.isdir(s):
+                    for r, _, fs in os.walk(s, followlinks=True):
+                        for f in sorted(fs):
+                            yield os.path.join(r, f)
+                    continue
+
+                raise IOError(s + ": invalid or non-existent source for fasta files")
+
         def _open1(fa_path):
             fai_path = fa_path + '.fai'
             if (os.path.exists(fai_path) and os.stat(fa_path).st_mtime > os.stat(fai_path).st_mtime):
@@ -127,14 +141,7 @@ class MultiFastaDB(object):
             self._logger.info("opened " + fa_path)
             return faf
 
-        for source in self.sources:
-            if not os.path.exists(source):
-                raise IOError("Sequence path does not exist: {}".format(source))
-
-        fa_paths = [os.path.join(r, f)
-                    for s in self.sources
-                    for r, _, fs in os.walk(s, followlinks=True)
-                    for f in fs
+        fa_paths = [f for f in _find_files(self.sources)
                     if any(f.endswith(sfx) for sfx in self.suffixes)]
 
         self._fastas = collections.OrderedDict((fa_path, _open1(fa_path)) for fa_path in fa_paths)
@@ -143,9 +150,16 @@ class MultiFastaDB(object):
 
 
     def create_index(self):
-        """Create a convenience meta index in the form of an ordered dict
-        that contains just the reference accession and not the full
-        accession from the FASTA file
+        """Create a convenience meta index in which secondary accessions refer
+        to primary accessions that occur in the fasta file. 
+
+        For example, the primary accession
+        'gi|548923668|ref|NM_001284401.1|' would generate two
+        secondary accessions '548923668' and 'NM_001284401.1', and two
+        tuples ('548923668', 'gi|548923668|ref|NM_001284401.1|') and
+        ('NM_001284401.1', 'gi|548923668|ref|NM_001284401.1|') in the
+        meta index. Attempts to lookup a secondary accession return
+        the sequence for the corresponding primary accession.
 
         """
         self._index = collections.OrderedDict()
