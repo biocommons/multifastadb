@@ -39,6 +39,7 @@ setup(
     setup_requires = [
         'setuptools_scm',
         'nose',
+        'wheel',
     ],
 
     tests_require = [
