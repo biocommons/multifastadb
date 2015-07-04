@@ -55,5 +55,5 @@ accessing large sequences (e.g., chromosomes).
 The locations of a given accession may be found with the `where_is()` method:
 
 >>> mfdb.where_is('gi|53292629|ref|NP_001005405.1|')   # doctest: +ELLIPSIS
-[('tests/data/ncbi/f1.human.protein.small.faa...', <pysam... object at ...>)]
+[('...f1.human.protein.small.faa...', <pysam... object at ...>)]
 

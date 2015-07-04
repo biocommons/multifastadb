@@ -32,6 +32,7 @@ setup(
     ],
 
     install_requires = [
+        'ordered-set',
         'pysam>=0.7.0',
     ],
 

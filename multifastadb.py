@@ -61,6 +61,7 @@ import logging
 import os
 import re
 
+from ordered_set import OrderedSet
 import pysam
 
 
@@ -141,10 +142,12 @@ class MultiFastaDB(object):
             self._logger.info("opened " + fa_path)
             return faf
 
-        fa_paths = [f for f in _find_files(self.sources)
-                    if any(f.endswith(sfx) for sfx in self.suffixes)]
+        fa_paths = OrderedSet(
+            os.path.realpath(f) for f in _find_files(self.sources)
+            if any(f.endswith(sfx) for sfx in self.suffixes))
 
-        self._fastas = collections.OrderedDict((fa_path, _open1(fa_path)) for fa_path in fa_paths)
+        self._fastas = collections.OrderedDict(
+            (fa_path, _open1(fa_path)) for fa_path in fa_paths)
 
         self.create_index()
 
