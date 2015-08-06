@@ -1,0 +1,69 @@
+#!/bin/bash
+# gz-to-bgz -- convert gzipped filed to block gzipped files
+
+# options:
+# -f -- force overwrite of existing bgz (otherwise skip)
+# -l -- symlink source gz to bgz on successful conversion
+# -r -- remove source gz on successful conversion
+# -T -- don't set mtime of bgz to source gz file
+# -v -- verbose
+
+set -o pipefail
+
+PATH=/usr/bin:/bin
+unset GZIP
+
+declare -A opts
+while getopts ":flrTv" opt; do
+    opts[$opt]=1
+done
+shift $((OPTIND - 1))
+
+if [ "${opts[l]}" = "1" -a "${opts[r]}" = 1 ]; then
+    echo "$0: -r and -l are mutually exclusive" 1>&2
+    exit 1
+fi
+
+if [ "${opts[v]}" = "1" ]; then
+    v=-v
+fi
+
+if ! type bgzip >/dev/null 2>/dev/null; then
+    echo "$0: Can't find bgzip executable" 1>&2
+    exit 2
+fi
+
+for gz in "$@"; do
+    # N.B. space after colon is essential!
+    if [ "${gz: -2}" != "gz" ]; then
+	echo "$gz: doesn't have gz suffix; skipping" 1>&2
+	continue
+    fi
+    
+    bgz=${gz%.gz}.bgz
+    if [ -f "$bgz" -a ! "${opts[f]}" = "1" ]; then
+	echo "$bgz: file exists and force (-f) not specified; skipping" 1>&2
+	continue
+    fi
+    
+    if ! gzip -cdq <"$gz" | bgzip >"$bgz.tmp"; then
+	echo "$gz: failed" 1>&2
+	exit 3
+    fi
+    mv "$bgz.tmp" "$bgz"
+    if [ "${opts[v]}" = "1" ]; then
+	echo "Converted $gz -> $bgz" 1>&2
+    fi
+
+
+    if [ "${opts[T]}" != "1" ]; then
+	touch -hr "$gz" "$bgz"
+    fi
+
+    if [ "${opts[l]}" = "1" ]; then
+	ln -fns $v "$(basename "$bgz")" "$gz"
+    elif [ "${opts[r]}" = "1" ]; then
+	rm -f $v "$gz"
+    fi
+
+done
