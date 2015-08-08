@@ -94,6 +94,7 @@ class MultiFastaDB(object):
         def __str__(self):
             return self.mfdb.fetch(self.ac)
 
+
     # Files must be fasta formatted with one of the following standard
     # fasta file extensions, or a block gzipped version of these
     # (which is supported by pysam >=0.8.3).  For block gzipped files,
@@ -176,7 +177,7 @@ class MultiFastaDB(object):
                     self._index[ac] = ref
                 else:
                     files = [e[0] for e in self.where_is(ac)]
-                    self._logger.debug('duplicate sequence found for {ac} in {files}'.format(ac=ac, files=', '.join(files)))
+                    self._logger.debug('multiple entries found for {ac} in {files}'.format(ac=ac, files=', '.join(files)))
 
 
     def where_is(self, ac):
@@ -202,6 +203,7 @@ class MultiFastaDB(object):
     def references(self):
         return list(itertools.chain.from_iterable([
             fa.references for fa in self._fastas.values()]))
+
         
     @property
     def lengths(self):
@@ -212,8 +214,9 @@ class MultiFastaDB(object):
     def __contains__(self, ac):
         return any([ac in fh for fh in self._fastas.itervalues()])
 
+
     def __getitem__(self, ac):
-        return self.SequenceProxy(self, ac)
+        return self.SequenceProxy(self, ac) if ac in self else None
 
 
 ## <LICENSE>
