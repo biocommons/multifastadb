@@ -1,20 +1,27 @@
 #!/bin/bash
 # gz-to-bgz -- convert gzipped filed to block gzipped files
+# recommended options: -ltuv
 
 # options:
-# -f -- force overwrite of existing bgz (otherwise skip)
+# -f -- force overwrite bgz file
 # -l -- symlink source gz to bgz on successful conversion
 # -r -- remove source gz on successful conversion
-# -T -- don't set mtime of bgz to source gz file
+# -t -- set mtime of bgz to source gz file
+# -u -- overwrite (update) bgz file if gzip file is newer
 # -v -- verbose
 
 set -o pipefail
-
 PATH=/usr/bin:/bin
 unset GZIP
 
+
+samefile() {
+    [ $(realpath -e "$1") -ef $(realpath -e "$2") ]
+}
+
+
 declare -A opts
-while getopts ":flrTv" opt; do
+while getopts ":flrtuv" opt; do
     opts[$opt]=1
 done
 shift $((OPTIND - 1))
@@ -28,10 +35,12 @@ if [ "${opts[v]}" = "1" ]; then
     v=-v
 fi
 
+
 if ! type bgzip >/dev/null 2>/dev/null; then
     echo "$0: Can't find bgzip executable" 1>&2
     exit 2
 fi
+
 
 for gz in "$@"; do
     # N.B. space after colon is essential!
@@ -39,24 +48,47 @@ for gz in "$@"; do
 	echo "$gz: doesn't have gz suffix; skipping" 1>&2
 	continue
     fi
-    
+
     bgz=${gz%.gz}.bgz
-    if [ -f "$bgz" -a ! "${opts[f]}" = "1" ]; then
-	echo "$bgz: file exists and force (-f) not specified; skipping" 1>&2
-	continue
+
+    # Process file only if one of the following is true:
+    # 1) file doesn't exist
+    # 2) force is specified
+    # 3) gzip is newer than bgzip and update is specified
+    # Conversely, skip if file exists and any of:
+    # 1) they are the same file
+    # 2) force isn't specied and any of:
+    # 2a) bgzip newer gzip file
+    # 2b) update is not requested
+    if [ -f "$bgz" ]; then
+	if samefile "$gz" "$bgz"; then
+	    echo "$bgz and $gz are same file; skipping" 1>&2
+	    # gz -> bgz, likely from a previous run; skip always
+	    continue
+	fi
+
+	if [ "${opts[f]}" != "1" ]; then
+	    if [ "$bgz" -nt "$gz" ]; then
+		echo "$bgz is newer than $gz and exists force (-f) was not specified; skipping" 1>&2
+		continue
+	    fi
+	    if [ "${opts[u]}" != "1" ]; then
+		echo "$gz is newer than $bgz and update (-u) was not specified; skipping" 1>&2
+		continue
+	    fi
+	fi
     fi
     
+    if [ "${opts[v]}" = "1" ]; then
+	echo "Converting $gz to $bgz..." 1>&2
+    fi
     if ! gzip -cdq <"$gz" | bgzip >"$bgz.tmp"; then
 	echo "$gz: failed" 1>&2
 	exit 3
     fi
     mv "$bgz.tmp" "$bgz"
-    if [ "${opts[v]}" = "1" ]; then
-	echo "Converted $gz -> $bgz" 1>&2
-    fi
 
-
-    if [ "${opts[T]}" != "1" ]; then
+    if [ "${opts[t]}" = "1" ]; then
 	touch -hr "$gz" "$bgz"
     fi
 
