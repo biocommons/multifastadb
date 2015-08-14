@@ -216,7 +216,7 @@ class MultiFastaDB(object):
 
 
     def __getitem__(self, ac):
-        return self.SequenceProxy(self, ac) if ac in self else None
+        return self.SequenceProxy(self, ac) if ac in self._index else None
 
 
 ## <LICENSE>
