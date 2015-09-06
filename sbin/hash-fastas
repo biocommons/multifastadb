@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+
+"""generates TSV of md5, sdha1, sha512, length, accession, and
+sequences excerpt for fasta files
+
+"""
+
+from __future__ import print_function
+
+import hashlib
+import logging
+import sys
+
+
+from colorclass import Color
+from etaprogress.progress import ProgressBar
+from multifastadb import MultiFastaDB
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+mfdb = MultiFastaDB(sources=sys.argv[1:], use_meta_index=True)
+
+def excerpt(s, w=25):
+    ellipsis = '...'
+    return s if len(s) <= 2 * w + len(ellipsis) else s[:w] + ellipsis + s[-w:]
+
+pbar = ProgressBar(len(mfdb.references))
+pbar.bar.CHAR_FULL = Color('{autoyellow}#{/autoyellow}')
+pbar.bar.CHAR_LEADING = Color('{autoyellow}#{/autoyellow}')
+pbar.bar.CHAR_LEFT_BORDER = Color('{autoblue}[{/autoblue}')
+pbar.bar.CHAR_RIGHT_BORDER = Color('{autoblue}]{/autoblue}')
+
+for r in mfdb.references:
+    sources = [s[1] for s in mfdb.where_is(r)]
+    seqs = set(s[r].upper() for s in sources)
+    if len(seqs) > 1:
+        logger.error("multiple distinct sequences for "+r)
+    for seq in seqs:
+        print("\t".join([hashlib.md5(seq).hexdigest(), hashlib.sha1(seq).hexdigest(),
+                         hashlib.sha512(seq).hexdigest(), str(len(seq)), r, excerpt(seq)]))
+    pbar.numerator += 1
+    sys.stderr.write(str(pbar) + '\r')
+    sys.stderr.flush()    
+sys.stderr.write(str(pbar))

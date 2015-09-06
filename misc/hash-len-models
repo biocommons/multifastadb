@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+import collections
+from math import ceil, log
+import sys
+
+from statistics import mean, mode
+
+nper = 1                        # related to dirents/dir = 16**2 = 256
+b = 1000
+
+def logb(b,m):
+    return log(m) / log(b)
+
+def nhu_a(sz):
+    return (1+int(ceil(logb(b,sz))))
+
+def nhd_b(sz):
+    return 1 if sz < 10**3 else 2 if sz < 10**5 else 3 if sz < 10**7 else 4
+    
+nhd = nhd_b
+
+
+sizes = collections.defaultdict(lambda: [])
+keylen_bins = collections.defaultdict(lambda: [])
+for line in sys.stdin:
+    key, sz = line.strip().split('\t')
+    szi = int(sz)
+    bin_key = key[:nper*nhd(szi)]
+    sizes[bin_key].append(szi)
+    keylen_bins[len(bin_key)].append(bin_key)
+
+for kl in sorted(keylen_bins.keys()):
+    bin_keys = keylen_bin[kl]
+    print("#" + "\t".join([str(x) for x in [
+        str(len(bin_keys)),
+                            
+
+
+                            str(sum(szs)),
+                str(min(szs)), str(int(mean(szs))), str(max(szs))]))
+    
+#for bin_key in sorted(sizes.keys()):
+#    szs = sizes[bin_key]
+#    print("\t".join([bin_key, str(len(szs)), str(sum(szs)),
+#                     str(min(szs)), str(int(mean(szs))), str(max(szs))]))
+

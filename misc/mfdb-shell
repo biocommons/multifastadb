@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import logging
+
+from multifastadb import MultiFastaDB
+
+logging.basicConfig(level=logging.DEBUG)
+
+fa_dirs = [
+    '/home/reece/projects/biocommons/mirrors-ncbi/2015/07/31/refseq/H_sapiens/mRNA_Prot/human.9.rna.fna.bgz',
+    ]
+
+mfdb = MultiFastaDB(fa_dirs, use_meta_index=True)
+
+prefixes = set(r[:2] for r in mfdb.references)
+
+print(len(mfdb.references))
+print(prefixes)
+print('XM_005256572.1' in mfdb.references)
+
+import IPython; IPython.embed()	  ### TODO: Remove IPython.embed()
+
