@@ -65,6 +65,8 @@ from ordered_set import OrderedSet
 import pysam
 
 
+# TODO: clarify bad key and bad coords behavior (raise v. '' v. None)
+
 class MultiFastaDB(object):
     """
     """
@@ -88,6 +90,7 @@ class MultiFastaDB(object):
         def __getslice__(self, start_i, end_i):
             return self.mfdb.fetch(self.ac, start_i, end_i)
 
+        # TODO: deprecate this... mixing interval (getslice) and base coordinates (here) is eerie
         def __getitem__(self, i):
             return self[i, i + 1]
 
@@ -121,18 +124,20 @@ class MultiFastaDB(object):
 
         """
 
+        def _has_valid_suffix(f):
+            return any(f.endswith(sfx) for sfx in self.suffixes)
+
         def _find_files(sources):
             for s in sources:
                 if os.path.isfile(s):
                     yield s
                     continue
-
                 if os.path.isdir(s):
                     for r, _, fs in os.walk(s, followlinks=True):
                         for f in sorted(fs):
-                            yield os.path.join(r, f)
+                            if _has_valid_suffix(f):
+                                yield os.path.join(r, f)
                     continue
-
                 raise IOError(s + ": invalid or non-existent source for fasta files")
 
         def _open1(fa_path):
@@ -143,9 +148,8 @@ class MultiFastaDB(object):
             self._logger.info("opened " + fa_path)
             return faf
 
-        fa_paths = OrderedSet(
-            os.path.realpath(f) for f in _find_files(self.sources)
-            if any(f.endswith(sfx) for sfx in self.suffixes))
+        fa_paths = OrderedSet(os.path.realpath(f) for f in _find_files(self.sources))
+
 
         self._fastas = collections.OrderedDict(
             (fa_path, _open1(fa_path)) for fa_path in fa_paths)
@@ -190,14 +194,6 @@ class MultiFastaDB(object):
                 for fp, fh in self._fastas.iteritems()
                 if ac in fh]
 
-    def fetch(self, ac, start_i=None, end_i=None):
-        """return a sequence, or subsequence if start_i and end_i are provided"""
-        for fah in self._fastas.values():
-            seq = fah.fetch(self._index[ac], start_i, end_i)
-            if seq != '':
-                return seq
-        return None
-
 
     @property
     def references(self):
@@ -209,6 +205,17 @@ class MultiFastaDB(object):
     def lengths(self):
         return list(itertools.chain.from_iterable([
             fa.lengths for fa in self._fastas.values()]))
+
+
+    def fetch(self, ac, start_i=None, end_i=None):
+        """return a sequence, or subsequence if start_i and end_i are provided"""
+        # TODO: should use whereis
+        # TODO: should fetch always use a proxy for consistency?
+        for fah in self._fastas.values():
+            seq = fah.fetch(self._index[ac], start_i, end_i)
+            if seq != '':
+                return seq
+        return None
 
 
     def __contains__(self, ac):
