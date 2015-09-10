@@ -87,12 +87,10 @@ class MultiFastaDB(object):
             self.mfdb = mfdb
             self.ac = ac
 
-        def __getslice__(self, start_i, end_i):
-            return self.mfdb.fetch(self.ac, start_i, end_i)
-
-        # TODO: deprecate this... mixing interval (getslice) and base coordinates (here) is eerie
-        def __getitem__(self, i):
-            return self[i, i + 1]
+        def __getitem__(self, key):
+            if isinstance(key, slice):
+                return self.mfdb.fetch(self.ac, key.start, key.stop)[::key.step]
+            raise TypeError("SequenceProxy accepts only slice intervals (in interbase coordinates)")
 
         def __str__(self):
             return self.mfdb.fetch(self.ac)
