@@ -120,7 +120,7 @@ class MultiFastaDB(object):
 
 
     def __getitem__(self, ac):
-        return SequenceProxy(self, ac) if ac in self._index else None
+        return SequenceProxy(self, self._index[ac])
 
 
     def where_is(self, ac):
@@ -156,7 +156,7 @@ class MultiFastaDB(object):
                 return fah.fetch(self._index[ac], start_i, end_i)
             except KeyError:
                 pass
-        raise KeyError("{} not found".format(ac))
+        raise KeyError(ac)
 
 
     def _open_sources(self):

@@ -53,6 +53,12 @@ class MFDB_Test_d1f1(MFDBTBase):
         self.assertEqual( str(self.mfdb['s1']), u'd1f1s1' )
         self.assertEqual( self.mfdb['s1'][:2], u'd1' )
 
+    def test_non_existent_keys(self):
+        with self.assertRaises(KeyError):
+            self.mfdb["nonexistentkey"]
+        with self.assertRaises(KeyError):
+            self.mfdb.fetch("nonexistentkey")
+
 
 class MFDB_Test_d1(MFDBTBase):
     sources = ['d1']
