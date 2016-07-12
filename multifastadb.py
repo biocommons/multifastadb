@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-"""
-MultiFastaDB presents a collection of indexed fasta files as a single
-source.  The intent is to simplify accessing a virtual database of
-sequences that is distributed across multiple files.
+"""MultiFastaDB presents a collection of indexed fasta files as a
+single source.  The intent is to simplify accessing a virtual database
+of sequences that is distributed across multiple files.
 
 
 >>> from multifastadb import MultiFastaDB
@@ -49,11 +47,12 @@ accessing large sequences (e.g., chromosomes).
 
 The locations of a given accession may be found with the `where_is()` method:
 
->>> mfdb.where_is('gi|53292629|ref|NP_001005405.1|')   # doctest: +ELLIPSIS
-[('tests/data/ncbi/f1.human.protein.small.faa.gz', <pysam.cfaidx.Fastafile object at ...>)]
+>>> print(mfdb.where_is('gi|53292629|ref|NP_001005405.1|'))
+[('.../f1.human.protein.small.faa', <pysam.cfaidx.Fastafile object at ...>)]
 
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
 import itertools
@@ -92,9 +91,6 @@ class SequenceProxy(object):
 
 
 class MultiFastaDB(object):
-    """
-    """
-
     # Files must be fasta formatted with one of the following standard
     # fasta file extensions, or a block gzipped version of these
     # (which is supported by pysam >=0.8.3).  For block gzipped files,
@@ -131,7 +127,10 @@ class MultiFastaDB(object):
         """return list of all (filename,pysam.Fastafile) pairs in which
         accession occurs
 
-        TODO: This is broken for meta index lookups
+        Because this function is intended to find all locations of a
+        primary accession, this function does *not* use the meta
+        index (but the caller might do so herself).
+
         """
         return [(fp, fh)
                 for fp, fh in six.iteritems(self._fastas)
@@ -152,18 +151,12 @@ class MultiFastaDB(object):
 
     def fetch(self, ac, start_i=None, end_i=None):
         """return a sequence, or subsequence if start_i and end_i are provided"""
-        # TODO: should use whereis
-        # TODO: should fetch always use a proxy for consistency?
         for fah in self._fastas.values():
             try:
                 return fah.fetch(self._index[ac], start_i, end_i)
             except KeyError:
                 pass
-        # TODO: clarify bad key and bad coords behavior (raise v. '' v. None)
-        # TODO: return KeyError instead
-        return None
-
-
+        raise KeyError("{} not found".format(ac))
 
 
     def _open_sources(self):
@@ -206,16 +199,28 @@ class MultiFastaDB(object):
 
 
     def _create_index(self):
-        """Create a convenience meta index in which secondary accessions refer
-        to primary accessions that occur in the fasta file. 
+        """Create an dictionary-based index from primary and secondary
+        accessions to primary accessions.
 
-        For example, the primary accession
-        'gi|548923668|ref|NM_001284401.1|' would generate two
-        (secondary_accession, primary_accession) tuples ('548923668',
-        'gi|548923668|ref|NM_001284401.1|') and ('NM_001284401.1',
-        'gi|548923668|ref|NM_001284401.1|') in the meta
-        index. Attempts to lookup a secondary accession return the
-        sequence for the corresponding primary accession.
+        Here, a primary accession is that which appears as the first
+        element in the defline.  Secondary accessions are parsed from
+        the primary accession, especially from certain fasta files
+        from NCBI.
+
+        For example, for the primary accession
+
+          'gi|548923668|ref|NM_001284401.1|
+
+        would generate (secondary_accession, primary_accession) tuples
+
+          ('548923668', 'gi|548923668|ref|NM_001284401.1|')
+          ('NM_001284401.1', 'gi|548923668|ref|NM_001284401.1|')
+
+        in the meta index.  For simplicity, the identity tuple 
+
+          ('gi|548923668|ref|NM_001284401.1|', 'gi|548923668|ref|NM_001284401.1|')
+
+        is included so that *all* lookups go through the meta index.
 
         """
 
@@ -234,10 +239,13 @@ class MultiFastaDB(object):
                         ac=ac, files=', '.join(files)))
 
 
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
 
 
 ## <LICENSE>
-## Copyright 2014 project contributors (https://bitbucket.org/biocommons/multifastadb)
+## Copyright 2014-2016 project contributors (https://bitbucket.org/biocommons/multifastadb)
 ## 
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
