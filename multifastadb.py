@@ -63,6 +63,10 @@ import re
 
 from ordered_set import OrderedSet
 import pysam
+import six
+
+
+_logger = logging.getLogger()
 
 
 # TODO: clarify bad key and bad coords behavior (raise v. '' v. None)
@@ -105,7 +109,9 @@ class MultiFastaDB(object):
     # See http://samtools.sourceforge.net/tabix.shtml
     file_suffixes = ['fa', 'fasta', 'faa', 'fna']
     compression_suffixes = ['bgz']
-    default_suffixes = file_suffixes + [fs + "." + cs for fs in file_suffixes for cs in compression_suffixes]
+    default_suffixes = file_suffixes + [fs + "." + cs
+                                        for fs,cs in itertools.product(file_suffixes,compression_suffixes)]
+
 
     def __init__(self, sources=[], suffixes=default_suffixes, use_meta_index=False):
         self._fastas = None
@@ -115,6 +121,7 @@ class MultiFastaDB(object):
         self.suffixes = ["." + sfx for sfx in suffixes]
         self.use_meta_index = use_meta_index
         self.open_sources()
+
 
     def open_sources(self):
         """Opens or reopens fasta sources (directories or files) provided when
@@ -179,7 +186,8 @@ class MultiFastaDB(object):
                     self._index[ac] = ref
                 else:
                     files = [e[0] for e in self.where_is(ac)]
-                    self._logger.debug('multiple entries found for {ac} in {files}'.format(ac=ac, files=', '.join(files)))
+                    self._logger.debug('multiple entries found for {ac} in {files}'.format(
+                        ac=ac, files=', '.join(files)))
 
 
     def where_is(self, ac):
@@ -189,7 +197,7 @@ class MultiFastaDB(object):
         TODO: This is broken for meta index lookups
         """
         return [(fp, fh)
-                for fp, fh in self._fastas.iteritems()
+                for fp, fh in six.iteritems(self._fastas)
                 if ac in fh]
 
 
@@ -210,9 +218,11 @@ class MultiFastaDB(object):
         # TODO: should use whereis
         # TODO: should fetch always use a proxy for consistency?
         for fah in self._fastas.values():
-            seq = fah.fetch(self._index[ac], start_i, end_i)
-            if seq != '':
-                return seq
+            try:
+                return fah.fetch(self._index[ac], start_i, end_i)
+            except KeyError:
+                pass
+        # TODO: return KeyError instead
         return None
 
 

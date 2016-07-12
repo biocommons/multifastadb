@@ -34,6 +34,7 @@ setup(
     install_requires = [
         'ordered-set',
         'pysam',
+        'six',
     ],
 
     setup_requires = [
