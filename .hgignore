@@ -20,6 +20,7 @@ syntax: glob
 .coverage
 .eggs
 .installed.cfg
+.tox
 archive
 bdist
 build

@@ -67,11 +67,7 @@ host-info:
 
 #=> test -- run all tests (except those tagged "extra")
 test: host-info
-	python setup.py nosetests -A '(not tags) or ("extra" not in tags)'
-
-#=> test-* -- run tests with specified tag
-test-%: host-info
-	python setup.py nosetests -a 'tags=$*'
+	tox
 
 #=> ci-test -- per-commit test target for CI
 ci-test: test
@@ -123,7 +119,7 @@ cleaner: clean
 #=> cleanest: above, and remove the virtualenv, .orig, and .bak files
 cleanest: cleaner
 	find . \( -name \*.orig -o -name \*.bak \) -print0 | xargs -0r /bin/rm -v
-	/bin/rm -fr distribute-* *.egg *.egg-info *.tar.gz nosetests.xml cover __pycache__
+	/bin/rm -fr distribute-* *.egg *.egg-info *.tar.gz nosetests.xml cover __pycache__ .eggs ve
 #=> pristine: above, and delete anything unknown to mercurial
 pristine: cleanest
 	hg st -un0 | xargs -0r echo /bin/rm -fv
