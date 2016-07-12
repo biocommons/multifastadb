@@ -66,39 +66,34 @@ import pysam
 import six
 
 
-_logger = logging.getLogger()
+class SequenceProxy(object):
 
+    """represents a future sequence fetch
 
-# TODO: clarify bad key and bad coords behavior (raise v. '' v. None)
+    SequenceProxy defers the actual fetch until a slice is
+    applied, allowing convenient and sexy slice syntax like this:
+
+    >> mfdb = MultiFastaDB('/my/seqs')
+    >> seq = mfdb['NM_01234.5'][4:20]
+
+    """
+
+    def __init__(self, mfdb, ac):
+        self.mfdb = mfdb
+        self.ac = ac
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            return self.mfdb.fetch(self.ac, key.start, key.stop)[::key.step]
+        raise TypeError("SequenceProxy accepts only slice intervals (in interbase coordinates)")
+
+    def __str__(self):
+        return self.mfdb.fetch(self.ac)
+
 
 class MultiFastaDB(object):
     """
     """
-
-    class SequenceProxy(object):
-
-        """represents a future sequence fetch
-
-        SequenceProxy defers the actual fetch until a slice is
-        applied, allowing convenient and sexy slice syntax like this:
-
-        >> mfdb = MultiFastaDB('/my/seqs')
-        >> seq = mfdb['NM_01234.5'][4:20]
-
-        """
-
-        def __init__(self, mfdb, ac):
-            self.mfdb = mfdb
-            self.ac = ac
-
-        def __getitem__(self, key):
-            if isinstance(key, slice):
-                return self.mfdb.fetch(self.ac, key.start, key.stop)[::key.step]
-            raise TypeError("SequenceProxy accepts only slice intervals (in interbase coordinates)")
-
-        def __str__(self):
-            return self.mfdb.fetch(self.ac)
-
 
     # Files must be fasta formatted with one of the following standard
     # fasta file extensions, or a block gzipped version of these
@@ -107,6 +102,7 @@ class MultiFastaDB(object):
     # NOT work with samtools, and we're requiring users to rename to
     # decrease confusion.
     # See http://samtools.sourceforge.net/tabix.shtml
+
     file_suffixes = ['fa', 'fasta', 'faa', 'fna']
     compression_suffixes = ['bgz']
     default_suffixes = file_suffixes + [fs + "." + cs
@@ -116,14 +112,61 @@ class MultiFastaDB(object):
     def __init__(self, sources=[], suffixes=default_suffixes, use_meta_index=False):
         self._fastas = None
         self._index = None
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger()
         self.sources = sources
         self.suffixes = ["." + sfx for sfx in suffixes]
         self.use_meta_index = use_meta_index
-        self.open_sources()
+        self._open_sources()
 
 
-    def open_sources(self):
+    def __contains__(self, ac):
+        return any([ac in fh for fh in self._fastas.itervalues()])
+
+
+    def __getitem__(self, ac):
+        return SequenceProxy(self, ac) if ac in self._index else None
+
+
+    def where_is(self, ac):
+        """return list of all (filename,pysam.Fastafile) pairs in which
+        accession occurs
+
+        TODO: This is broken for meta index lookups
+        """
+        return [(fp, fh)
+                for fp, fh in six.iteritems(self._fastas)
+                if ac in fh]
+
+
+    @property
+    def references(self):
+        return list(itertools.chain.from_iterable([
+            fa.references for fa in self._fastas.values()]))
+
+        
+    @property
+    def lengths(self):
+        return list(itertools.chain.from_iterable([
+            fa.lengths for fa in self._fastas.values()]))
+
+
+    def fetch(self, ac, start_i=None, end_i=None):
+        """return a sequence, or subsequence if start_i and end_i are provided"""
+        # TODO: should use whereis
+        # TODO: should fetch always use a proxy for consistency?
+        for fah in self._fastas.values():
+            try:
+                return fah.fetch(self._index[ac], start_i, end_i)
+            except KeyError:
+                pass
+        # TODO: clarify bad key and bad coords behavior (raise v. '' v. None)
+        # TODO: return KeyError instead
+        return None
+
+
+
+
+    def _open_sources(self):
         """Opens or reopens fasta sources (directories or files) provided when
         the instance was created.
 
@@ -159,24 +202,25 @@ class MultiFastaDB(object):
         self._fastas = collections.OrderedDict(
             (fa_path, _open1(fa_path)) for fa_path in fa_paths)
 
-        self.create_index()
+        self._create_index()
 
 
-    def create_index(self):
+    def _create_index(self):
         """Create a convenience meta index in which secondary accessions refer
         to primary accessions that occur in the fasta file. 
 
         For example, the primary accession
         'gi|548923668|ref|NM_001284401.1|' would generate two
-        secondary accessions '548923668' and 'NM_001284401.1', and two
-        tuples ('548923668', 'gi|548923668|ref|NM_001284401.1|') and
-        ('NM_001284401.1', 'gi|548923668|ref|NM_001284401.1|') in the
-        meta index. Attempts to lookup a secondary accession return
-        the sequence for the corresponding primary accession.
+        (secondary_accession, primary_accession) tuples ('548923668',
+        'gi|548923668|ref|NM_001284401.1|') and ('NM_001284401.1',
+        'gi|548923668|ref|NM_001284401.1|') in the meta
+        index. Attempts to lookup a secondary accession return the
+        sequence for the corresponding primary accession.
 
         """
+
         self._index = collections.OrderedDict()
-        ncbi_re = re.compile('(?:ref|gb)\|([^|]+)')
+        ncbi_re = re.compile('(?:gi|ref)\|([^|]+)')
         for ref in self.references:
             acs = [ref]
             if self.use_meta_index:
@@ -190,48 +234,6 @@ class MultiFastaDB(object):
                         ac=ac, files=', '.join(files)))
 
 
-    def where_is(self, ac):
-        """return list of all (filename,pysam.Fastafile) pairs in which
-        accession occurs
-
-        TODO: This is broken for meta index lookups
-        """
-        return [(fp, fh)
-                for fp, fh in six.iteritems(self._fastas)
-                if ac in fh]
-
-
-    @property
-    def references(self):
-        return list(itertools.chain.from_iterable([
-            fa.references for fa in self._fastas.values()]))
-
-        
-    @property
-    def lengths(self):
-        return list(itertools.chain.from_iterable([
-            fa.lengths for fa in self._fastas.values()]))
-
-
-    def fetch(self, ac, start_i=None, end_i=None):
-        """return a sequence, or subsequence if start_i and end_i are provided"""
-        # TODO: should use whereis
-        # TODO: should fetch always use a proxy for consistency?
-        for fah in self._fastas.values():
-            try:
-                return fah.fetch(self._index[ac], start_i, end_i)
-            except KeyError:
-                pass
-        # TODO: return KeyError instead
-        return None
-
-
-    def __contains__(self, ac):
-        return any([ac in fh for fh in self._fastas.itervalues()])
-
-
-    def __getitem__(self, ac):
-        return self.SequenceProxy(self, ac) if ac in self._index else None
 
 
 ## <LICENSE>
