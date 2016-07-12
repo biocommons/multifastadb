@@ -1,47 +1,106 @@
 #!/usr/bin/env python
 
+import bisect
 import collections
-from math import ceil, log
+import pickle
+import functools
+import gzip
+import itertools
+import math
 import sys
 
-from statistics import mean, mode
+import statistics
 
-nper = 1                        # related to dirents/dir = 16**2 = 256
-b = 1000
+max_bin_details = 10
 
-def logb(b,m):
-    return log(m) / log(b)
+# binners: set of functions that take slen and return bin_size
+binners = collections.OrderedDict([
+    # ('fixed0' , lambda sl: 0),
+    # ('fixed1' , lambda sl: 1),
+    # ('fixed2' , lambda sl: 2),
+    # ('fixed3' , lambda sl: 3),
+    # ('fixed4' , lambda sl: 4),
 
-def nhu_a(sz):
-    return (1+int(ceil(logb(b,sz))))
+    ('log100p2' , lambda sl: 2 + (0 if sl == 0 else int(math.log(sl,100)))),
+    ('log1000p1', lambda sl: 1 + (0 if sl == 0 else int(math.log(sl,1000)))),
+    ('log1000p2', lambda sl: 2 + (0 if sl == 0 else int(math.log(sl,1000)))),
+    ('2xlog1000p1', lambda sl: 2*(1 + (0 if sl == 0 else int(math.log(sl,1000))))),
 
-def nhd_b(sz):
-    return 1 if sz < 10**3 else 2 if sz < 10**5 else 3 if sz < 10**7 else 4
+    ('ldpA'   , lambda sl: 1 + bisect.bisect([0, 10**3, 10**5, 10**7], sl)),
+    ('ldpB'   , lambda sl: 1 + bisect.bisect([0, 10**3, 10**5, 10**6, 10**7], sl)),
+    ('ldpC'   , lambda sl: 2 if sl < 1000 else 3 if sl < 10000 else 6),
+    ('ldpD'   , lambda sl: 2 if sl < 1000 else 4 if sl < 100000 else 6),
+    ])
+
+
+def stats(v):
+    """return min, max, mean, median, sum from vector"""
+    return {
+        'count': len(v),
+        'max': max(v),
+        'mean': statistics.mean(v),
+        'median': statistics.median(v),
+        'min': min(v),
+        'sum': sum(v),
+        }
+
+
+
+if __name__ == "__main__":
+    fn = sys.argv[1]
+    pfn = fn + '.pkl'
     
-nhd = nhd_b
+    try:
+        with open(pfn,'rb') as pf:
+            hash_slen_pairs = pickle.load(pf)
+    except FileNotFoundError:
+        f = gzip.open(fn, mode="rt", encoding="utf-8")
 
+        # data: [(hash, slen)]
+        data = sorted([l.strip().split('\t')[0:2] for l in f])
 
-sizes = collections.defaultdict(lambda: [])
-keylen_bins = collections.defaultdict(lambda: [])
-for line in sys.stdin:
-    key, sz = line.strip().split('\t')
-    szi = int(sz)
-    bin_key = key[:nper*nhd(szi)]
-    sizes[bin_key].append(szi)
-    keylen_bins[len(bin_key)].append(bin_key)
+        # h_slen_dict: {h:set(lens)}
+        h_slen_dict = {gk:set(ge[1] for ge in gi) for gk,gi in itertools.groupby(data, lambda z: z[0])}
 
-for kl in sorted(keylen_bins.keys()):
-    bin_keys = keylen_bin[kl]
-    print("#" + "\t".join([str(x) for x in [
-        str(len(bin_keys)),
-                            
+        # ensure that hash:slen map is unique
+        multi_slen_hashes = [h for h,ls in h_slen_dict.items() if len(ls) > 1]
+        assert len(multi_slen_hashes) == 0
 
+        # hash_slens: [(h,slen)]
+        hash_slen_pairs = [(h,int(list(ls)[0])) for h,ls in h_slen_dict.items()]
 
-                            str(sum(szs)),
-                str(min(szs)), str(int(mean(szs))), str(max(szs))]))
+        with open(pfn,'wb') as pf:
+            pickle.dump(hash_slen_pairs, pf)
+
+    sys.stderr.write("{n} (h,slen) pairs (with distinct hashes)\n".format(n=len(hash_slen_pairs)))
+
+    for bname, binner in binners.items():
+        # [(h,slen)] -> [(b,slen)]
+        b_slen_pairs = [(h[:binner(sl)], sl) for h,sl in hash_slen_pairs]
+        b_slen_pairs.sort(key = lambda rec: (rec[0], rec[1]))  # sort by bin, len
+
+        # [(b,slen)] -> {b: [lens]}
+        b_slen = {b: list(b_slen[1] for b_slen in b_slen_i)
+                  for b, b_slen_i in itertools.groupby(b_slen_pairs, key=lambda rec: rec[0])}
+
+        # {bs: [b]}
+        bs_bins = {bs: list(b_i) for bs, b_i in itertools.groupby(
+            sorted(b_slen.keys(), key=lambda b: (len(b),b)),
+            key=lambda b: len(b))}
     
-#for bin_key in sorted(sizes.keys()):
-#    szs = sizes[bin_key]
-#    print("\t".join([bin_key, str(len(szs)), str(sum(szs)),
-#                     str(min(szs)), str(int(mean(szs))), str(max(szs))]))
+        print("* binner:{bname}, bs_n:{bs_n}".format(bname=bname, bs_n=len(bs_bins)))
+        for bs in sorted(bs_bins.keys()):
+            bins = bs_bins[bs]
+            bs_lens = sum([b_slen[b] for b in bins], [])
+            bs_sums = [sum(b_slen[b]) for b in bins]
+            bs_counts = [len(b_slen[b]) for b in bins]
+            print("** bs:{bs} | nbins:{nb:5d} | nseqs:{l[count]:9d}"
+                  " || counts:{n[min]:7d}/{n[max]:7d}/{n[mean]:7.0f}/{n[sum]:7d}"
+                  " || slengths:{l[min]:9d}/{l[max]:11d}/{l[mean]:8.0f}/{l[sum]:11d}"
+                  " || fsizes:{f[min]:11d}/{f[max]:11d}/{f[mean]:11.0f}/{f[sum]:11d}".format(
+                      bs=bs, nb=len(bins), l=stats(bs_lens), n=stats(bs_counts), f=stats(bs_sums)))
+            for b in bins[:max_bin_details]:
+                print("   {b}  nseqs:{l[count]:6d}  slengths:{l[min]:11d}/{l[max]:11d}/{l[mean]:8.0f}/{l[sum]:11d}".format(
+                    b=b, l=stats(b_slen[b])))
 
+    
